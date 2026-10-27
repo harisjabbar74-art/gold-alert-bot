@@ -1,0 +1,48 @@
+name: Gold alert
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      force_test:
+        description: "Send a test Telegram message (true or false)"
+        default: "false"
+
+concurrency:
+  group: gold-alert
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Remember the last alert so the same one is not sent twice.
+      - name: Restore last alert
+        uses: actions/cache@v4
+        with:
+          path: state.json
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+
+      - name: Check gold
+        env:
+          TWELVE_DATA_KEY: ${{ secrets.TWELVE_DATA_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LEVELS: ${{ vars.LEVELS }}
+          ROUND_STEP: ${{ vars.ROUND_STEP }}
+          ATR_BUFFER: ${{ vars.ATR_BUFFER }}
+          TREND_FILTER: ${{ vars.TREND_FILTER }}
+          FORCE_TEST: ${{ github.event.inputs.force_test }}
+        run: node gold_alert.mjs
